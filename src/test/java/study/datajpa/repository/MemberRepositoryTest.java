@@ -12,6 +12,8 @@ import study.datajpa.dto.MemberDto;
 import study.datajpa.entity.Member;
 import study.datajpa.entity.Team;
 
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +26,9 @@ public class MemberRepositoryTest {
 
     @Autowired MemberRepository memberRepository;
     @Autowired TeamRepository teamRepository;
+
+    @PersistenceContext
+    EntityManager em;
 
     @Test
     public void testMember() {
@@ -183,5 +188,68 @@ public class MemberRepositoryTest {
         assertThat(page.getNumber()).isEqualTo(0);
         assertThat(page.isFirst()).isTrue();
         assertThat(page.hasNext()).isTrue();
+    }
+
+    @Test
+    public void bulkUpdate() {
+        memberRepository.save(new Member("member1", 10));
+        memberRepository.save(new Member("member2", 19));
+        memberRepository.save(new Member("member3", 20));
+        memberRepository.save(new Member("member4", 21));
+        memberRepository.save(new Member("member5", 40));
+
+        int resultCount = memberRepository.bulkAgePlus(20);
+
+        List<Member> result = memberRepository.findByUsername("member5");
+        Member member5 = result.get(0);
+        System.out.println("member5 = " + member5);
+
+        assertThat(resultCount).isEqualTo(3);
+    }
+
+    @Test
+    public void findMemberLazy() {
+        Team teamA = new Team("teamA");
+        Team teamB = new Team("teamB");
+
+        teamRepository.save(teamA);
+        teamRepository.save(teamB);
+
+        Member member1 = new Member("member1", 10, teamA);
+        Member member2 = new Member("member2", 10, teamB);
+        memberRepository.save(member1);
+        memberRepository.save(member2);
+
+        em.flush();
+        em.clear();
+
+        List<Member> members = memberRepository.findMemberEntityGraph();
+
+        for (Member member : members) {
+            System.out.println("member = " + member);
+            System.out.println("member.getTeam().getName() = " + member.getTeam().getName());
+        }
+    }
+
+    @Test
+    public void queryHint() {
+        Member member1 = new Member("member1", 10);
+        memberRepository.save(member1);
+        em.flush();
+        em.clear();
+
+        Member findMember = memberRepository.findReadOnlyByUsername("member1");
+        findMember.setUsername("member2");
+        em.flush();
+    }
+
+    @Test
+    public void lock() {
+        Member member1 = new Member("member1", 10);
+        memberRepository.save(member1);
+        em.flush();
+        em.clear();
+
+        List<Member> result = memberRepository.findLockByUsername("member1");
     }
 }
